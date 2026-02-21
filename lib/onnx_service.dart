@@ -25,12 +25,14 @@ class OnnxService {
   OrtSession? _session;
   List<String>? _labels;
 
+  static const double TARGET_COIN_WIDTH =
+      710.0; // Calculated by getting average pixel width of coins in the training dataset
+
   Future<void> initModel() async {
     try {
       OrtEnv.instance.init();
       final sessionOptions = OrtSessionOptions();
 
-      // Make sure these match your filenames in assets exactly
       final rawModel = await rootBundle.load('assets/best.onnx');
       _session = OrtSession.fromBuffer(
         rawModel.buffer.asUint8List(),
@@ -54,106 +56,130 @@ class OnnxService {
       img.Image? originalImage = img.decodeImage(bytes);
       if (originalImage == null) return [];
 
-      // 1. Determine the scale to fit into 640
-      double scale = min(640 / originalImage.width, 640 / originalImage.height);
-      int newWidth = (originalImage.width * scale).round();
-      int newHeight = (originalImage.height * scale).round();
+      // --- PASS 1: Detect the coin in the original high-res image ---
+      print("Running Pass 1: Finding coin...");
+      List<YoloPrediction> firstPass = await _internalInference(originalImage);
 
-      // YOLOv11 expects 640x640
-      img.Image resized = img.copyResize(
+      YoloPrediction? coin;
+      try {
+        // Find the coin with the highest confidence
+        var coins = firstPass
+            .where((d) => d.label.toLowerCase().contains("coin"))
+            .toList();
+        coins.sort((a, b) => b.confidence.compareTo(a.confidence));
+        if (coins.isNotEmpty) coin = coins.first;
+      } catch (e) {
+        coin = null;
+      }
+
+      if (coin == null) {
+        print("No coin found. Falling back to standard scaling.");
+        return firstPass;
+      }
+
+      // --- PASS 2: Rescale image based on physical coin size ---
+      // coin.w is relative to the 640px internal canvas.
+      double scaleTo640 = min(
+        640 / originalImage.width,
+        640 / originalImage.height,
+      );
+      double coinWidthInOriginalPixels = coin.w / scaleTo640;
+
+      double scaleFactor = TARGET_COIN_WIDTH / coinWidthInOriginalPixels;
+
+      // Safety clamp: don't zoom more than 4x or shrink more than 0.25x
+      scaleFactor = scaleFactor.clamp(0.25, 4.0);
+
+      print("Coin detected. Scale factor: ${scaleFactor.toStringAsFixed(2)}");
+
+      int newWidth = (originalImage.width * scaleFactor).round();
+      img.Image rescaledImage = img.copyResize(
         originalImage,
         width: newWidth,
-        height: newHeight,
+        interpolation: img.Interpolation.average,
       );
 
-      // 3. Create a black 640x640 canvas and draw the resized image in the center
-      img.Image canvas = img.Image(width: 640, height: 640);
-      int offsetX = (640 - newWidth) ~/ 2;
-      int offsetY = (640 - newHeight) ~/ 2;
-
-      // 2. Prepare Input Tensor (CHW Format: Channel, Height, Width)
-      final inputData = Float32List(1 * 3 * 640 * 640);
-      for (int y = 0; y < resized.height; y++) {
-        for (int x = 0; x < resized.width; x++) {
-          final pixel = resized.getPixel(x, y);
-
-          int targetX = x + offsetX;
-          int targetY = y + offsetY;
-
-          if (targetX >= 0 && targetX < 640 && targetY >= 0 && targetY < 640) {
-            // Planar Format indexing
-            int rIndex = 0 * 640 * 640 + targetY * 640 + targetX;
-            int gIndex = 1 * 640 * 640 + targetY * 640 + targetX;
-            int bIndex = 2 * 640 * 640 + targetY * 640 + targetX;
-
-            inputData[rIndex] = pixel.r / 255.0; // RED
-            inputData[gIndex] = pixel.g / 255.0; // GREEN
-            inputData[bIndex] = pixel.b / 255.0; // BLUE
-          }
-        }
-      }
-
-      final inputOrt = OrtValueTensor.createTensorWithDataList(inputData, [
-        1,
-        3,
-        640,
-        640,
-      ]);
-      final inputs = {'images': inputOrt};
-      final outputs = _session!.run(OrtRunOptions(), inputs);
-
-      final outputMatrix = outputs[0]?.value as List<List<List<double>>>;
-      final rawData = outputMatrix[0];
-
-      // 2. Parse all candidates above a threshold (e.g., 0.4)
-      List<YoloPrediction> candidates = [];
-      int numClasses = _labels!.length;
-
-      for (int col = 0; col < 8400; col++) {
-        double maxScore = 0.0;
-        int classIdx = -1;
-
-        for (int row = 0; row < numClasses; row++) {
-          double score = rawData[4 + row][col];
-          if (score > maxScore) {
-            maxScore = score;
-            classIdx = row;
-          }
-        }
-
-        if (maxScore > 0.4) {
-          // DIAGNOSTIC PRINT: See what is being detected
-          print(
-            "DEBUG: Found ${_labels![classIdx]} (index $classIdx) with confidence $maxScore",
-          );
-
-          candidates.add(
-            YoloPrediction(
-              x: rawData[0][col],
-              y: rawData[1][col],
-              w: rawData[2][col],
-              h: rawData[3][col],
-              confidence: maxScore,
-              classIndex: classIdx,
-              label: _labels![classIdx],
-            ),
-          );
-        }
-      }
-
-      // 3. Apply NMS to remove overlapping boxes
-      List<YoloPrediction> finalDetections = _nms(candidates);
-
-      // Cleanup
-      inputOrt.release();
-      for (var element in outputs) element?.release();
-
-      return finalDetections;
+      // Run final species detection on the physically normalized image
+      return await _internalInference(rescaledImage);
     } catch (e, stacktrace) {
       print("❌ Inference Error: $e");
       print(stacktrace); // This helps find the exact line if it fails again
       return [];
     }
+  }
+
+  // private method handles the actual YOLO math
+  Future<List<YoloPrediction>> _internalInference(img.Image image) async {
+    // Letterboxing to 640x640
+    double scale = min(640 / image.width, 640 / image.height);
+    int newW = (image.width * scale).round();
+    int newH = (image.height * scale).round();
+    img.Image resized = img.copyResize(
+      image,
+      width: newW,
+      height: newH,
+      interpolation: img.Interpolation.average,
+    );
+
+    final inputData = Float32List(1 * 3 * 640 * 640);
+    int offsetX = (640 - newW) ~/ 2;
+    int offsetY = (640 - newH) ~/ 2;
+
+    for (int y = 0; y < resized.height; y++) {
+      for (int x = 0; x < resized.width; x++) {
+        final pixel = resized.getPixel(x, y);
+        int tx = x + offsetX;
+        int ty = y + offsetY;
+        if (tx >= 0 && tx < 640 && ty >= 0 && ty < 640) {
+          inputData[0 * 640 * 640 + ty * 640 + tx] = pixel.r / 255.0;
+          inputData[1 * 640 * 640 + ty * 640 + tx] = pixel.g / 255.0;
+          inputData[2 * 640 * 640 + ty * 640 + tx] = pixel.b / 255.0;
+        }
+      }
+    }
+
+    final inputOrt = OrtValueTensor.createTensorWithDataList(inputData, [
+      1,
+      3,
+      640,
+      640,
+    ]);
+    final outputs = _session!.run(OrtRunOptions(), {'images': inputOrt});
+    final rawData = (outputs[0]?.value as List<List<List<double>>>)[0];
+
+    // Parse all candidates above a threshold (e.g., 0.5)
+    List<YoloPrediction> candidates = [];
+    for (int col = 0; col < 8400; col++) {
+      double maxScore = 0.0;
+      int classIdx = -1;
+      for (int row = 0; row < _labels!.length; row++) {
+        double score = rawData[4 + row][col];
+        if (score > maxScore) {
+          maxScore = score;
+          classIdx = row;
+        }
+      }
+      if (maxScore > 0.5) {
+        print(
+          "DEBUG: Found ${_labels![classIdx]} (index $classIdx) with confidence $maxScore",
+        );
+        candidates.add(
+          YoloPrediction(
+            x: rawData[0][col],
+            y: rawData[1][col],
+            w: rawData[2][col],
+            h: rawData[3][col],
+            confidence: maxScore,
+            classIndex: classIdx,
+            label: _labels![classIdx],
+          ),
+        );
+      }
+    }
+    // Apply NMS to remove overlapping boxes
+    inputOrt.release();
+    for (var element in outputs) element?.release();
+    return _nms(candidates);
   }
 
   List<YoloPrediction> _nms(List<YoloPrediction> boxes) {

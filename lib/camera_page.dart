@@ -21,7 +21,7 @@ class _CameraPageState extends State<CameraPage> {
 
   // YOLO Predictions
   List<YoloPrediction> _detections = [];
-  String _majorityLabel = "";
+  // String _majorityLabel = "";
 
   @override
   void initState() {
@@ -96,7 +96,7 @@ class _CameraPageState extends State<CameraPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("ChilliSIA - Seed Identification Assistant"),
+        title: const Text("ChilliSIA"),
       ),
       body: Center(
         child: SingleChildScrollView(
@@ -133,16 +133,23 @@ class _CameraPageState extends State<CameraPage> {
                         height: d.h * scale,
                         child: Container(
                           decoration: BoxDecoration(
-                            border: d.label == "c.annuum"
-                                ? Border.all(color: Colors.red, width: 2)
-                                : Border.all(color: Colors.blue, width: 2),
+                            border: d.label == "c. annuum\r"
+                                ? Border.all(color: Colors.red, width: 1)
+                                : Border.all(
+                                    color: const Color.fromARGB(
+                                      255,
+                                      56,
+                                      219,
+                                      255,
+                                    ),
+                                    width: 1,
+                                  ),
                           ),
                           child: Text(
                             d.label.split(' ').first, // Short label
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 10,
-                              backgroundColor: Colors.red,
                             ),
                           ),
                         ),
@@ -159,11 +166,7 @@ class _CameraPageState extends State<CameraPage> {
                 child: Text(
                   _prediction,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.green,
-                  ),
+                  style:Theme.of(context).textTheme.bodyMedium,
                 ),
               ),
 
