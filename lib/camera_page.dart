@@ -56,7 +56,7 @@ class _CameraPageState extends State<CameraPage> {
               (d) =>
                   (d.label.toLowerCase().contains("c. annuum") ||
                       d.label.toLowerCase().contains("c. frutescens")) &&
-                  d.confidence > 0.90, // Confidence threshold
+                  d.confidence > 0.45, // Confidence threshold
             )
             .toList();
 
@@ -95,9 +95,7 @@ class _CameraPageState extends State<CameraPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("ChilliSIA"),
-      ),
+      appBar: AppBar(title: const Text("ChilliSIA")),
       body: Center(
         child: SingleChildScrollView(
           // Added scroll view for smaller screens
@@ -166,7 +164,7 @@ class _CameraPageState extends State<CameraPage> {
                 child: Text(
                   _prediction,
                   textAlign: TextAlign.center,
-                  style:Theme.of(context).textTheme.bodyMedium,
+                  style: Theme.of(context).textTheme.bodyMedium,
                 ),
               ),
 

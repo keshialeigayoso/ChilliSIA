@@ -147,7 +147,7 @@ class OnnxService {
     final outputs = _session!.run(OrtRunOptions(), {'images': inputOrt});
     final rawData = (outputs[0]?.value as List<List<List<double>>>)[0];
 
-    // Parse all candidates above a threshold (e.g., 0.5)
+    // Parse all candidates above a threshold (e.g., 0.45)
     List<YoloPrediction> candidates = [];
     for (int col = 0; col < 8400; col++) {
       double maxScore = 0.0;
@@ -159,7 +159,7 @@ class OnnxService {
           classIdx = row;
         }
       }
-      if (maxScore > 0.5) {
+      if (maxScore > 0.45) {
         print(
           "DEBUG: Found ${_labels![classIdx]} (index $classIdx) with confidence $maxScore",
         );
