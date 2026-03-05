@@ -176,6 +176,7 @@ class _CameraPageState extends State<CameraPage> {
 
               const SizedBox(height: 30),
 
+              //ADD CAMERA OVERLAY INSTRUCTIONS
               // Buttons
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
