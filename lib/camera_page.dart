@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'onnx_service.dart'; // Import onnx service file
+import 'onnx_service.dart';
 
 class CameraPage extends StatefulWidget {
   const CameraPage({super.key});
@@ -134,11 +134,11 @@ class _CameraPageState extends State<CameraPage> {
                             border: d.label == "c. annuum\r"
                                 ? Border.all(color: Colors.red, width: 1)
                                 : Border.all(
-                                    color: const Color.fromARGB(
-                                      255,
-                                      56,
-                                      219,
-                                      255,
+                                    color: const Color.from(
+                                      alpha: 1,
+                                      red: 0.22,
+                                      green: 0.859,
+                                      blue: 1,
                                     ),
                                     width: 1,
                                   ),

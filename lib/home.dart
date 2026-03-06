@@ -1,9 +1,13 @@
 import 'package:chillisia/intructions_page.dart';
+import 'package:chillisia/seed_detection_page.dart';
 import 'package:flutter/material.dart';
 import 'camera_page.dart';
+import 'package:camera/camera.dart';
 
 class HomePage extends StatelessWidget {
-  const HomePage({super.key});
+  final List<CameraDescription> cameras;
+
+  const HomePage({super.key, required this.cameras});
 
   @override
   Widget build(BuildContext context) {
@@ -45,6 +49,17 @@ class HomePage extends StatelessWidget {
                 );
               },
               child: const Text('Start Seed Identification'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => SeedDetectionPage(cameras: cameras),
+                  ),
+                );
+              },
+              child: const Text('Open Camera'),
             ),
             ElevatedButton(
               onPressed: () {

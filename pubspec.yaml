@@ -37,6 +37,9 @@ dependencies:
   image_picker: ^1.2.1
   onnxruntime: ^1.4.1
   image: ^4.7.2
+  camera: ^0.11.3
+  permission_handler: ^12.0.1
+  yuv_to_png: ^1.0.1
 
 dev_dependencies:
   flutter_test:

@@ -48,13 +48,25 @@ class OnnxService {
   }
 
   Future<List<YoloPrediction>> runInference(File imageFile) async {
-    if (_session == null) return [];
+    print("🔍 runInference called");
+    print("Session is null? ${_session == null}");
+    if (_session == null) {
+      print("⚠️ ONNX Session is null! Initializing model...");
+      await initModel();
+    }
+    if (_session == null) {
+      print("❌ Failed to initialize model");
+      return [];
+    }
 
     try {
       // 1. Image Pre-processing
       final bytes = await imageFile.readAsBytes();
       img.Image? originalImage = img.decodeImage(bytes);
-      if (originalImage == null) return [];
+      if (originalImage == null) {
+        print("❌ Failed to decode image");
+        return [];
+      }
 
       // --- PASS 1: Detect the coin in the original high-res image ---
       print("Running Pass 1: Finding coin...");
@@ -108,6 +120,19 @@ class OnnxService {
     }
   }
 
+  Future<List<YoloPrediction>> runInferenceOnLiveImage(
+    img.Image liveFrame,
+  ) async {
+    if (_session == null) return [];
+
+    try {
+      return await _internalInference(liveFrame);
+    } catch (e) {
+      print("Live Image Error: $e");
+      return [];
+    }
+  }
+
   // private method handles the actual YOLO math
   Future<List<YoloPrediction>> _internalInference(img.Image image) async {
     // Letterboxing to 640x640
@@ -138,6 +163,7 @@ class OnnxService {
       }
     }
 
+    // Run ONNX Session
     final inputOrt = OrtValueTensor.createTensorWithDataList(inputData, [
       1,
       3,
@@ -176,7 +202,7 @@ class OnnxService {
         );
       }
     }
-    // Apply NMS to remove overlapping boxes
+    // Apply Non-Maximum Suppression to remove overlapping boxes
     inputOrt.release();
     for (var element in outputs) element?.release();
     return _nms(candidates);
