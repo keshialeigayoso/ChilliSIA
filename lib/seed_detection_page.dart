@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:math';
 import 'package:chillisia/detection_painter.dart';
 import 'package:flutter/services.dart';
 import 'package:image/image.dart' as img;
@@ -27,6 +26,8 @@ class _SeedDetectionPageState extends State<SeedDetectionPage> {
   double _exposureOffset = 0.0;
   double _minExposure = 0.0;
   double _maxExposure = 0.0;
+  double? _imageWidth; // Width of orientedImage
+  double? _imageHeight; // Height of orientedImage
 
   @override
   void initState() {
@@ -98,24 +99,39 @@ class _SeedDetectionPageState extends State<SeedDetectionPage> {
         return;
       }
 
-      print("Step 3: Rotating Image...");
-      img.Image orientedImage = img.copyRotate(decodedImage, angle: 90);
+      print("Step 3: Resizing Image...");
+      final double currentWidth = decodedImage.width.toDouble();
+      final double currentHeight = decodedImage.height.toDouble();
 
-      print("Step 4: Resizing Image...");
-      img.Image resizedImage = img.copyResize(
-        orientedImage,
-        width: 640,
-        height: 640,
+      final int targetSize = 640;
+      double ratio = currentWidth > currentHeight
+          ? targetSize / currentWidth
+          : targetSize / currentHeight;
+
+      int newWidth = (currentWidth * ratio).toInt();
+      int newHeight = (currentHeight * ratio).toInt();
+
+      img.Image resized = img.copyResize(
+        decodedImage,
+        width: newWidth,
+        height: newHeight,
       );
+      img.Image letterboxed = img.Image(width: targetSize, height: targetSize);
 
-      print("Step 5: Running Inference...");
-      final results = await _onnxService.runInferenceOnLiveImage(resizedImage);
+      int dstX = (targetSize - newWidth) ~/ 2;
+      int dstY = (targetSize - newHeight) ~/ 2;
+      img.compositeImage(letterboxed, resized, dstX: dstX, dstY: dstY);
+
+      print("Step 4: Running Inference...");
+      final results = await _onnxService.runInferenceOnLiveImage(letterboxed);
 
       print("Detections: ${results.length}");
 
       if (mounted) {
         setState(() {
           _liveResults = results;
+          _imageWidth = currentWidth;
+          _imageHeight = currentHeight;
         });
       }
     } catch (e) {
@@ -191,9 +207,9 @@ class _SeedDetectionPageState extends State<SeedDetectionPage> {
         _isAnalyzing = true;
         print("Frame Received!");
 
-        // Conversion Note: You must convert CameraImage (YUV) to RGB
+        // Conversion Note: convert CameraImage (YUV) to RGB
         // before passing to ONNX. Using a background isolate is best.
-        _runLiveInference(image); //.then((_) => _isAnalyzing = false)
+        _runLiveInference(image);
       });
     } else {
       _controller?.stopImageStream();
@@ -245,32 +261,13 @@ class _SeedDetectionPageState extends State<SeedDetectionPage> {
               /// LIVE DETECTIONS
               if (_isLiveMode && _liveResults.isNotEmpty)
                 Positioned.fill(
-                  child: CustomPaint(painter: DetectionPainter(_liveResults)),
+                  child: CustomPaint(
+                    painter: DetectionPainter(
+                      _liveResults,
+                      Size(_imageWidth!, _imageHeight!),
+                    ),
+                  ),
                 ),
-              // if (_isLiveMode && _liveResults.isNotEmpty)
-              //   ..._liveResults.map((prediction) {
-              //     final left = (prediction.x - prediction.w / 2);
-              //     final top = (prediction.y - prediction.h / 2);
-
-              //     return Positioned(
-              //       left: left * constraints.maxWidth,
-              //       top: top * constraints.maxHeight,
-              //       width: prediction.w * constraints.maxWidth,
-              //       height: prediction.h * constraints.maxHeight,
-              //       child: Container(
-              //         decoration: BoxDecoration(
-              //           border: Border.all(color: Colors.red, width: 2),
-              //         ),
-              //         child: Text(
-              //           "${prediction.label} ${(prediction.confidence * 100).toStringAsFixed(0)}%",
-              //           style: const TextStyle(
-              //             color: Colors.white,
-              //             backgroundColor: Colors.red,
-              //           ),
-              //         ),
-              //       ),
-              //     );
-              //   }).toList(),
 
               /// GUIDE OVERLAY
               if (!_isLiveMode)
@@ -278,14 +275,11 @@ class _SeedDetectionPageState extends State<SeedDetectionPage> {
                   child: Container(
                     width: constraints.maxWidth * 0.7,
                     height: constraints.maxHeight * 0.5,
-                    decoration: BoxDecoration(
-                      border: Border.all(
-                        color: Colors.yellow.withOpacity(0.5),
-                        width: 2,
-                      ),
-                      borderRadius: BorderRadius.circular(15),
-                      color: Colors.black12,
-                    ),
+                    // decoration: BoxDecoration(
+                    //   // border: Border.all(width: 2),
+                    //   borderRadius: BorderRadius.circular(15),
+                    //   color: Colors.black12,
+                    // ),
                     child: Column(
                       children: [
                         /// COIN ZONE
@@ -304,9 +298,9 @@ class _SeedDetectionPageState extends State<SeedDetectionPage> {
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Icon(
-                                  Icons.monetization_on_outlined,
+                                  Icons.circle_outlined,
                                   color: Colors.yellow,
-                                  size: 40,
+                                  size: 70,
                                 ),
                                 Text(
                                   "PLACE COIN HERE",
@@ -327,11 +321,6 @@ class _SeedDetectionPageState extends State<SeedDetectionPage> {
                           child: const Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(
-                                Icons.blur_on,
-                                color: Colors.yellow,
-                                size: 40,
-                              ),
                               Text(
                                 "PLACE SEEDS HERE",
                                 style: TextStyle(

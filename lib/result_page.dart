@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'dart:math';
-
+import 'package:chillisia/detection_painter.dart';
 import 'package:chillisia/onnx_service.dart';
 import 'package:flutter/material.dart';
 
@@ -32,53 +32,40 @@ class ResultPage extends StatelessWidget {
           Expanded(
             child: LayoutBuilder(
               builder: (context, constraints) {
-                double containerWidth = constraints.maxWidth;
-                double containerHeight = constraints.maxHeight;
+                // 1. Calculate the scale to fit image inside constraints (BoxFit.contain logic)
                 double scale = min(
-                  containerWidth / imageWidth,
-                  containerHeight / imageHeight,
+                  constraints.maxWidth / imageWidth,
+                  constraints.maxHeight / imageHeight,
                 );
-                double offsetX = (containerWidth - imageWidth * scale) / 2;
-                double offsetY = (containerHeight - imageHeight * scale) / 2;
+
+                // 2. Determine the actual size of the image on screen
+                double displayWidth = imageWidth * scale;
+                double displayHeight = imageHeight * scale;
 
                 return Center(
-                  child: Stack(
-                    children: [
-                      Image.file(File(imagePath), fit: BoxFit.contain),
+                  child: SizedBox(
+                    width: displayWidth,
+                    height: displayHeight,
+                    child: Stack(
+                      children: [
+                        Image.file(
+                          File(imagePath),
+                          fit: BoxFit.contain,
+                          width: displayWidth,
+                          height: displayHeight,
+                        ),
 
-                      // DRAW BOXES
-                      if (predictions.isNotEmpty)
-                        ...predictions.map((d) {
-                          return Positioned(
-                            left: d.x * scale + offsetX,
-                            top: d.y * scale + offsetY,
-                            width: d.w * scale,
-                            height: d.h * scale,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                border: d.label == "c. annuum\r"
-                                    ? Border.all(color: Colors.red, width: 1)
-                                    : Border.all(
-                                        color: const Color.fromARGB(
-                                          255,
-                                          56,
-                                          219,
-                                          255,
-                                        ),
-                                        width: 1,
-                                      ),
-                              ),
-                              child: Text(
-                                d.label.split(' ').first, // Short label
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10,
-                                ),
-                              ),
+                        // DRAW BOXES
+                        Positioned.fill(
+                          child: CustomPaint(
+                            painter: DetectionPainter(
+                              predictions,
+                              Size(imageWidth, imageHeight),
                             ),
-                          );
-                        }).toList(),
-                    ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 );
               },
