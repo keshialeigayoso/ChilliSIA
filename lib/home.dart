@@ -1,13 +1,20 @@
+import 'dart:io';
 import 'package:chillisia/intructions_page.dart';
+import 'package:chillisia/onnx_service.dart';
+import 'package:chillisia/result_page.dart';
 import 'package:chillisia/seed_detection_page.dart';
+import 'package:chillisia/theme/theme_constants.dart';
 import 'package:flutter/material.dart';
+import 'package:image/image.dart' as img;
+import 'package:image_picker/image_picker.dart';
 import 'camera_page.dart';
 import 'package:camera/camera.dart';
 
 class HomePage extends StatelessWidget {
   final List<CameraDescription> cameras;
+  final picker = ImagePicker();
 
-  const HomePage({super.key, required this.cameras});
+  HomePage({super.key, required this.cameras});
 
   @override
   Widget build(BuildContext context) {
@@ -42,13 +49,45 @@ class HomePage extends StatelessWidget {
             ),
             const SizedBox(height: 20),
             ElevatedButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const CameraPage()),
+              onPressed: () async {
+                final ImagePicker picker = ImagePicker();
+                final pickedFile = await picker.pickImage(
+                  source: ImageSource.gallery,
                 );
+
+                try {
+                  if (pickedFile != null) {
+                    final OnnxService _onnxService = OnnxService();
+                    final results = await _onnxService.runInference(
+                      File(pickedFile.path),
+                    );
+
+                    // compute original image dimensions
+                    final bytes = await File(pickedFile.path).readAsBytes();
+                    final img.Image? decodedImage = img.decodeImage(bytes);
+                    double imgWidth = decodedImage?.width.toDouble() ?? 0.0;
+                    double imgHeight = decodedImage?.height.toDouble() ?? 0.0;
+
+                    // navigate to results page
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ResultPage(
+                          imagePath: pickedFile.path,
+                          predictions: results,
+                          imageWidth: imgWidth,
+                          imageHeight: imgHeight,
+                        ),
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Error picking image')),
+                  );
+                }
               },
-              child: const Text('Start Seed Identification'),
+              child: const Text('Upload an Image'),
             ),
             ElevatedButton(
               onPressed: () {
@@ -60,8 +99,9 @@ class HomePage extends StatelessWidget {
                 );
               },
               child: const Text('Open Camera'),
+              style: AppButtonStyles.accent,
             ),
-            ElevatedButton(
+            TextButton(
               onPressed: () {
                 Navigator.push(
                   context,
