@@ -1,9 +1,16 @@
 import 'package:flutter/material.dart';
 
-const PRIMARY_COLOR = Color.fromARGB(255, 37, 103, 30);
-const ACCENT_COLOR = Color.fromARGB(255, 242, 181, 11);
-const WHITE_SHADE = Color.fromARGB(255, 247, 240, 240);
-const LIGHT_GREEN = Color.fromARGB(255, 72, 161, 17);
+class AppColors {
+  static const Color primary = Color.fromARGB(255, 37, 103, 30);
+  static const Color accent = Color.fromARGB(255, 242, 181, 11);
+  static const Color whiteShade = Color.fromARGB(255, 247, 240, 240);
+  static const Color lightGreen = Color.fromARGB(255, 72, 161, 17);
+}
+
+const PRIMARY_COLOR = AppColors.primary;
+const ACCENT_COLOR = AppColors.accent;
+const WHITE_SHADE = AppColors.whiteShade;
+const LIGHT_GREEN = AppColors.lightGreen;
 
 ThemeData appTheme = ThemeData(
   fontFamily: 'Poppins',

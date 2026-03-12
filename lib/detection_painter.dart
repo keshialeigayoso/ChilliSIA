@@ -31,6 +31,8 @@ class DetectionPainter extends CustomPainter {
       Color boxColor;
       String label = p.label.toLowerCase().trim();
 
+      if (p.confidence < 0.5) continue; // Skip low-confidence detections
+
       if (label.contains('annuum')) {
         boxColor = Colors.red;
       } else if (label.contains('frutescens')) {
