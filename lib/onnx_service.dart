@@ -69,50 +69,50 @@ class OnnxService {
       }
 
       // --- PASS 1: Detect the coin in the original high-res image ---
-      print("Running Pass 1: Finding coin...");
-      List<YoloPrediction> firstPass = await _internalInference(originalImage);
+      // print("Running Pass 1: Finding coin...");
+      // List<YoloPrediction> firstPass = await _internalInference(originalImage);
 
-      YoloPrediction? coin;
-      try {
-        // Find the coin with the highest confidence
-        var coins = firstPass
-            .where((d) => d.label.toLowerCase().contains("coin"))
-            .toList();
-        coins.sort((a, b) => b.confidence.compareTo(a.confidence));
-        if (coins.isNotEmpty) coin = coins.first;
-      } catch (e) {
-        coin = null;
-      }
+      // YoloPrediction? coin;
+      // try {
+      //   // Find the coin with the highest confidence
+      //   var coins = firstPass
+      //       .where((d) => d.label.toLowerCase().contains("coin"))
+      //       .toList();
+      //   coins.sort((a, b) => b.confidence.compareTo(a.confidence));
+      //   if (coins.isNotEmpty) coin = coins.first;
+      // } catch (e) {
+      //   coin = null;
+      // }
 
-      if (coin == null) {
-        print("No coin found. Falling back to standard scaling.");
-        return firstPass;
-      }
+      // if (coin == null) {
+      //   print("No coin found. Falling back to standard scaling.");
+      //   return firstPass;
+      // }
 
-      // --- PASS 2: Rescale image based on physical coin size ---
-      // coin.w is relative to the 640px internal canvas.
-      double scaleTo640 = min(
-        640 / originalImage.width,
-        640 / originalImage.height,
-      );
-      double coinWidthInOriginalPixels = coin.w / scaleTo640;
+      // // --- PASS 2: Rescale image based on physical coin size ---
+      // // coin.w is relative to the 640px internal canvas.
+      // double scaleTo640 = min(
+      //   640 / originalImage.width,
+      //   640 / originalImage.height,
+      // );
+      // double coinWidthInOriginalPixels = coin.w / scaleTo640;
 
-      double scaleFactor = TARGET_COIN_WIDTH / coinWidthInOriginalPixels;
+      // double scaleFactor = TARGET_COIN_WIDTH / coinWidthInOriginalPixels;
 
-      // Safety clamp: don't zoom more than 4x or shrink more than 0.25x
-      scaleFactor = scaleFactor.clamp(0.25, 4.0);
+      // // Safety clamp: don't zoom more than 4x or shrink more than 0.25x
+      // scaleFactor = scaleFactor.clamp(0.25, 4.0);
 
-      print("Coin detected. Scale factor: ${scaleFactor.toStringAsFixed(2)}");
+      // print("Coin detected. Scale factor: ${scaleFactor.toStringAsFixed(2)}");
 
-      int newWidth = (originalImage.width * scaleFactor).round();
-      img.Image rescaledImage = img.copyResize(
-        originalImage,
-        width: newWidth,
-        interpolation: img.Interpolation.average,
-      );
+      // int newWidth = (originalImage.width * scaleFactor).round();
+      // img.Image rescaledImage = img.copyResize(
+      //   originalImage,
+      //   width: newWidth,
+      //   interpolation: img.Interpolation.average,
+      // );
 
       // Run final species detection on the physically normalized image
-      return await _internalInference(rescaledImage);
+      return await _internalInference(originalImage);
     } catch (e, stacktrace) {
       print("❌ Inference Error: $e");
       print(stacktrace); // This helps find the exact line if it fails again
