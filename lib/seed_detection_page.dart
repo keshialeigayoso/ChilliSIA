@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:chillisia/detection_painter.dart';
+import 'package:chillisia/loading_overlay.dart';
 import 'package:flutter/services.dart';
 import 'package:image/image.dart' as img;
 import 'package:camera/camera.dart';
@@ -129,7 +130,6 @@ class _SeedDetectionPageState extends State<SeedDetectionPage> {
       final Uint8List? pngBytes = await YuvToPng.yuvToPng(cameraImage);
 
       if (pngBytes == null) {
-        print("Step 1 Failed: pngBytes is null");
         return;
       }
 
@@ -137,7 +137,6 @@ class _SeedDetectionPageState extends State<SeedDetectionPage> {
       img.Image? decodedImage = img.decodeImage(pngBytes);
 
       if (decodedImage == null) {
-        print("Step 2 Failed: decodedImage is null");
         return;
       }
 
@@ -222,6 +221,38 @@ class _SeedDetectionPageState extends State<SeedDetectionPage> {
     }
   }
 
+  Future<void> _pickAndAnalyzeImage() async {
+    try {
+      final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+      if (pickedFile == null) return;
+
+      final results = await _onnxService.runInference(File(pickedFile.path));
+
+      final bytes = await File(pickedFile.path).readAsBytes();
+      img.Image? decodedImage = img.decodeImage(bytes);
+      double imgWidth = decodedImage?.width.toDouble() ?? 0.0;
+      double imgHeight = decodedImage?.height.toDouble() ?? 0.0;
+
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ResultPage(
+              imagePath: pickedFile.path,
+              predictions: results,
+              imageWidth: imgWidth,
+              imageHeight: imgHeight,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Error picking image')));
+    }
+  }
+
   // MODE 2: Live Inference Logic
   void _toggleLiveMode(bool newValue) {
     setState(() {
@@ -293,6 +324,31 @@ class _SeedDetectionPageState extends State<SeedDetectionPage> {
                   child: CameraPreview(_controller!),
                 ),
               ),
+
+              /// 2. LIVE INDICATOR (Top Left)
+              if (_isLiveMode)
+                Positioned(
+                  top: 50, // Adjusted for status bar
+                  left: 20,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Text(
+                      "LIVE",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
 
               /// LIVE DETECTIONS
               if (_isLiveMode && _liveResults.isNotEmpty)
@@ -401,7 +457,7 @@ class _SeedDetectionPageState extends State<SeedDetectionPage> {
                 Positioned(
                   right: 20,
                   top: 100,
-                  bottom: 100,
+                  bottom: 150,
                   child: RotatedBox(
                     quarterTurns: 3,
                     child: Slider(
@@ -413,18 +469,42 @@ class _SeedDetectionPageState extends State<SeedDetectionPage> {
                   ),
                 ),
 
-              /// CONTROLS
+              /// 4. CONTROLS (Modernized)
               Positioned(
-                bottom: 30,
+                bottom: 40,
                 left: 0,
                 right: 0,
                 child: Column(
                   children: [
-                    // Action Icons Row
+                    // LIVE Toggle & Upload Row
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
-                        // Toggle Brightness Button
+                        // Upload Gallery Icon
+                        IconButton(
+                          icon: const Icon(
+                            Icons.image,
+                            color: Colors.white,
+                            size: 28,
+                          ),
+                          onPressed: _pickAndAnalyzeImage,
+                        ),
+
+                        // THE "LIVE" TEXT TOGGLE
+                        GestureDetector(
+                          onTap: () => _toggleLiveMode(!_isLiveMode),
+                          child: Text(
+                            "LIVE",
+                            style: TextStyle(
+                              color: _isLiveMode ? Colors.red : Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                        ),
+
+                        // Brightness Toggle Icon
                         IconButton(
                           icon: Icon(
                             _showBrightnessSlider
@@ -436,80 +516,43 @@ class _SeedDetectionPageState extends State<SeedDetectionPage> {
                             () =>
                                 _showBrightnessSlider = !_showBrightnessSlider,
                           ),
-                          tooltip: "Change Brightness",
-                        ),
-                        const SizedBox(width: 20),
-                        // Upload Image Button
-                        IconButton(
-                          icon: const Icon(Icons.image, color: Colors.white),
-                          onPressed: () async {
-                            final pickedFile = await _picker.pickImage(
-                              source: ImageSource.gallery,
-                            );
-
-                            try {
-                              if (pickedFile != null) {
-                                final results = await _onnxService.runInference(
-                                  File(pickedFile.path),
-                                );
-
-                                // compute original image dimensions
-                                final bytes = await File(
-                                  pickedFile.path,
-                                ).readAsBytes();
-                                final img.Image? decodedImage = img.decodeImage(
-                                  bytes,
-                                );
-                                double imgWidth =
-                                    decodedImage?.width.toDouble() ?? 0.0;
-                                double imgHeight =
-                                    decodedImage?.height.toDouble() ?? 0.0;
-
-                                // navigate to results page
-                                if (mounted) {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => ResultPage(
-                                        imagePath: pickedFile.path,
-                                        predictions: results,
-                                        imageWidth: imgWidth,
-                                        imageHeight: imgHeight,
-                                      ),
-                                    ),
-                                  );
-                                }
-                              }
-                            } catch (e) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Error picking image'),
-                                ),
-                              );
-                            }
-                          },
-                          tooltip: "Upload Image",
                         ),
                       ],
                     ),
 
-                    SwitchListTile(
-                      title: const Text(
-                        "Live Analysis",
-                        style: TextStyle(color: Colors.white),
-                      ),
-                      value: _isLiveMode,
-                      onChanged: _toggleLiveMode,
-                    ),
-                    ElevatedButton(
-                      onPressed: _isLiveMode ? null : _takePhotoAndAnalyze,
-                      child: Text(
-                        _isLiveMode ? "Analyzing Live..." : "Capture Photo",
+                    const SizedBox(height: 30),
+
+                    // CIRCULAR SHUTTER BUTTON
+                    GestureDetector(
+                      onTap: _isLiveMode ? null : _takePhotoAndAnalyze,
+                      child: Container(
+                        height: 80,
+                        width: 80,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 4),
+                        ),
+                        child: Center(
+                          child: Container(
+                            height: 60,
+                            width: 60,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              // Dims the button if in live mode (since you can't "capture")
+                              color: _isLiveMode
+                                  ? Colors.white38
+                                  : Colors.white,
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
+
+              // LOADING OVERLAY
+              if (_isAnalyzing && !_isLiveMode) const AnalysisLoadingOverlay(),
             ],
           );
         },
