@@ -60,7 +60,7 @@ class _SeedDetectionPageState extends State<SeedDetectionPage> {
 
     await _controller!.initialize();
 
-    // Ensure we are locked to portrait to maintain 9:16 logic
+    // Ensure locked to portrait to maintain 9:16 logic
     await _controller!.lockCaptureOrientation(DeviceOrientation.portraitUp);
 
     _minExposure = await _controller!.getMinExposureOffset();
@@ -125,62 +125,54 @@ class _SeedDetectionPageState extends State<SeedDetectionPage> {
   }
 
   Future<void> _runLiveInference(CameraImage cameraImage) async {
+    if (!_isLiveMode || !mounted || _isAnalyzing) return;
+
+    _isAnalyzing = true;
+
     try {
-      print("Step 1: Starting YUV Conversion...");
       final Uint8List? pngBytes = await YuvToPng.yuvToPng(cameraImage);
+      if (pngBytes == null) return;
 
-      if (pngBytes == null) {
-        return;
-      }
-
-      print("Step 2: Decoding Image...");
       img.Image? decodedImage = img.decodeImage(pngBytes);
+      if (decodedImage == null) return;
 
-      if (decodedImage == null) {
-        return;
-      }
+      // Use the optimized internal inference that handles resizing/letterboxing
+      final results = await _onnxService.runInferenceOnLiveImage(decodedImage);
 
-      print("Step 3: Resizing Image...");
-      final double currentWidth = decodedImage.width.toDouble();
-      final double currentHeight = decodedImage.height.toDouble();
-
-      final int targetSize = 640;
-      double ratio = currentWidth > currentHeight
-          ? targetSize / currentWidth
-          : targetSize / currentHeight;
-
-      int newWidth = (currentWidth * ratio).toInt();
-      int newHeight = (currentHeight * ratio).toInt();
-
-      img.Image resized = img.copyResize(
-        decodedImage,
-        width: newWidth,
-        height: newHeight,
-      );
-      img.Image letterboxed = img.Image(width: targetSize, height: targetSize);
-
-      int dstX = (targetSize - newWidth) ~/ 2;
-      int dstY = (targetSize - newHeight) ~/ 2;
-      img.compositeImage(letterboxed, resized, dstX: dstX, dstY: dstY);
-
-      print("Step 4: Running Inference...");
-      final results = await _onnxService.runInferenceOnLiveImage(letterboxed);
-
-      print("Detections: ${results.length}");
-
-      if (mounted) {
+      if (mounted && _isLiveMode) {
         setState(() {
           _liveResults = results;
-          _imageWidth = currentWidth;
-          _imageHeight = currentHeight;
+          _imageWidth = decodedImage.width.toDouble();
+          _imageHeight = decodedImage.height.toDouble();
         });
       }
     } catch (e) {
-      print("Live Conversion Error: $e");
+      print("Live Inference Error: $e");
     } finally {
+      // Throttle: wait 300ms before allowing the next frame
       await Future.delayed(const Duration(milliseconds: 300));
-      _isAnalyzing = false;
+      if (mounted) {
+        setState(() {
+          _isAnalyzing = false;
+        });
+      }
     }
+  }
+
+  @override
+  void dispose() {
+    // 1. Set the flag to false so the inference loop stops immediately
+    _isLiveMode = false;
+
+    // 2. Stop the image stream if it is currently running
+    if (_controller != null && _controller!.value.isStreamingImages) {
+      _controller!.stopImageStream();
+    }
+
+    // 3. dispose of the hardware controller
+    _controller?.dispose();
+
+    super.dispose();
   }
 
   // MODE 1: Take Photo Logic
@@ -192,7 +184,7 @@ class _SeedDetectionPageState extends State<SeedDetectionPage> {
       final XFile photo = await _controller!.takePicture();
       final File imageFile = File(photo.path);
 
-      // Run the deep inference (with dual-pass coin scaling)
+      // Run the deep inference
       final results = await _onnxService.runInference(imageFile);
 
       // Get image dimensions for ResultPage
@@ -257,25 +249,15 @@ class _SeedDetectionPageState extends State<SeedDetectionPage> {
   void _toggleLiveMode(bool newValue) {
     setState(() {
       _isLiveMode = newValue;
-      _isAnalyzing = false; // Reset the gate whenever we toggle
+      _isAnalyzing = false; // Reset the gate
       _liveResults = []; // Clear old boxes
     });
 
     if (_isLiveMode) {
-      print("Starting live analysis...");
       if (_controller == null) {
-        print("Controller is null, cannot start image stream");
         return;
       }
-      print("Controller is initialized, starting image stream");
       _controller?.startImageStream((CameraImage image) {
-        print("Image stream callback called");
-        if (_isAnalyzing) return;
-        _isAnalyzing = true;
-        print("Frame Received!");
-
-        // Conversion Note: convert CameraImage (YUV) to RGB
-        // before passing to ONNX. Using a background isolate is best.
         _runLiveInference(image);
       });
     } else {
@@ -325,11 +307,45 @@ class _SeedDetectionPageState extends State<SeedDetectionPage> {
                 ),
               ),
 
-              /// 2. LIVE INDICATOR (Top Left)
+              // BACK BUTTON
+              Positioned(
+                top: 40, // Adjust for status bar height
+                left: 10,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(
+                      0.3,
+                    ), // Semi-transparent circle
+                    shape: BoxShape.circle,
+                  ),
+                  child: IconButton(
+                    icon: const Icon(Icons.arrow_back, color: Colors.white),
+                    onPressed: () async {
+                      // This safely returns the user to the previous page (Home Page)
+                      setState(() {
+                        _isLiveMode = false;
+                      });
+
+                      // Stop the camera stream if it's running
+                      if (_controller != null &&
+                          _controller!.value.isStreamingImages) {
+                        await _controller!.stopImageStream();
+                      }
+
+                      // go back to Home
+                      if (mounted) {
+                        Navigator.pop(context);
+                      }
+                    },
+                  ),
+                ),
+              ),
+
+              /// LIVE INDICATOR (Top Right)
               if (_isLiveMode)
                 Positioned(
                   top: 50, // Adjusted for status bar
-                  left: 20,
+                  right: 20,
                   child: Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 8,
@@ -390,11 +406,6 @@ class _SeedDetectionPageState extends State<SeedDetectionPage> {
                   child: Container(
                     width: constraints.maxWidth * 0.7,
                     height: constraints.maxHeight * 0.5,
-                    // decoration: BoxDecoration(
-                    //   // border: Border.all(width: 2),
-                    //   borderRadius: BorderRadius.circular(15),
-                    //   color: Colors.black12,
-                    // ),
                     child: Column(
                       children: [
                         /// COIN ZONE
@@ -469,7 +480,7 @@ class _SeedDetectionPageState extends State<SeedDetectionPage> {
                   ),
                 ),
 
-              /// 4. CONTROLS (Modernized)
+              /// CONTROLS
               Positioned(
                 bottom: 40,
                 left: 0,
@@ -538,7 +549,7 @@ class _SeedDetectionPageState extends State<SeedDetectionPage> {
                             width: 60,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              // Dims the button if in live mode (since you can't "capture")
+                              // Dims the button if in live mode
                               color: _isLiveMode
                                   ? Colors.white38
                                   : Colors.white,
