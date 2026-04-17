@@ -89,6 +89,15 @@ flutter:
     - assets/best.onnx
     - assets/labels.txt
     - assets/Logo.png
+    - assets/INSTRUC HOME.jpg
+    - assets/INSTRUC AFTER.jpg
+    - assets/INSTRUC BEFORE.jpg
+    - assets/INSTRUC Gallery Icon.png
+    - assets/INSTRUC Brightness Icon.png
+    - assets/INSTRUC brightness slider.png
+    - assets/INSTRUC COIN.jpg
+    - assets/INSTRUC GUIDE.jpg
+    
   #   - images/a_dot_burr.jpeg
   #   - images/a_dot_ham.jpeg
 
