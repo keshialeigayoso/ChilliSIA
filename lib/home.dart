@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:chillisia/about_page.dart';
 import 'package:chillisia/intructions_page.dart';
 import 'package:chillisia/loading_overlay.dart';
 import 'package:chillisia/onnx_service.dart';
@@ -65,7 +66,20 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('ChilliSIA')),
+      appBar: AppBar(
+        title: const Text('ChilliSIA'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.info_outline),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const AboutPage()),
+              );
+            },
+          ),
+        ],
+      ),
       body: Stack(
         // Added Stack to allow overlay
         children: [
@@ -113,6 +127,19 @@ class _HomePageState extends State<HomePage> {
                   },
                   child: const Text('View Instructions'),
                 ),
+
+                // TextButton.icon(
+                //   onPressed: () {
+                //     Navigator.push(
+                //       context,
+                //       MaterialPageRoute(
+                //         builder: (context) => const AboutPage(),
+                //       ),
+                //     );
+                //   },
+                //   icon: const Icon(Icons.info_outline),
+                //   label: const Text('About ChilliSIA'),
+                // ),
               ],
             ),
           ),
