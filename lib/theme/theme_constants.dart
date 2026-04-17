@@ -22,13 +22,13 @@ ThemeData appTheme = ThemeData(
 
   // Text Theme
   textTheme: const TextTheme(
-    headlineLarge: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+    headlineLarge: TextStyle(fontSize: 30, fontWeight: FontWeight.bold),
     headlineMedium: TextStyle(
-      fontSize: 24,
+      fontSize: 22,
       fontWeight: FontWeight.bold,
     ), // Heading
     titleMedium: TextStyle(
-      fontSize: 18,
+      fontSize: 17,
       fontWeight: FontWeight.w600,
     ), // Subheading
     bodyMedium: TextStyle(fontSize: 16),

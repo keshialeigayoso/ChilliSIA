@@ -73,6 +73,7 @@ class _HomePageState extends State<HomePage> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
+                Image.asset('assets/Logo.png', height: 150, width: 150),
                 Text(
                   'Welcome to ChilliSIA!',
                   style: Theme.of(context).textTheme.headlineLarge,

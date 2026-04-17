@@ -29,7 +29,7 @@ class InstructionsPage extends StatelessWidget {
             ),
             _buildSection(
               "4. Distance & Focus",
-              "Keep the camera approx. 12cm away. Tap the screen to focus on the seeds. Blurry images will lead to wrong IDs.",
+              "Keep the camera approx. 10cm away. Tap the screen to focus on the seeds. Blurry images will lead to wrong IDs.",
               Icons.center_focus_strong_outlined,
             ),
             _buildSection(
