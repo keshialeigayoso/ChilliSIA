@@ -208,7 +208,6 @@ class InstructionsPage extends StatelessWidget {
     );
   }
 
-  // Widget builder for image screenshots with automatic fallback to a grey box if file not found
   Widget _buildScreenshot(String assetPath, String caption) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,

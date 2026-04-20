@@ -47,20 +47,20 @@ class _SeedDetectionPageState extends State<SeedDetectionPage> {
     if (status.isGranted) {
       _initCamera();
     } else {
-      // Show error or open settings
+      print("Camera permission denied");
     }
   }
 
   void _initCamera() async {
     _controller = CameraController(
       widget.cameras[0],
-      ResolutionPreset.high, // 'high' is typically 1080p or 720p (16:9)
+      ResolutionPreset.high, // (16:9)
       enableAudio: false,
     );
 
     await _controller!.initialize();
 
-    // Ensure locked to portrait to maintain 9:16 logic
+    // locked to portrait to maintain 9:16 logic
     await _controller!.lockCaptureOrientation(DeviceOrientation.portraitUp);
 
     _minExposure = await _controller!.getMinExposureOffset();
@@ -92,7 +92,7 @@ class _SeedDetectionPageState extends State<SeedDetectionPage> {
       offsetY = (constraints.maxHeight - previewHeight) / 2;
     }
 
-    // 2. Show the visual indicator on the screen
+    // Show the visual indicator on the screen
     setState(() {
       _tapPosition = Offset(
         details.localPosition.dx + offsetX,
@@ -102,7 +102,7 @@ class _SeedDetectionPageState extends State<SeedDetectionPage> {
     });
 
     try {
-      // 3. Tell the camera to focus and set exposure at that point
+      // Tell the camera to focus and set exposure at that point
       await _controller!.setFocusPoint(focusPoint);
       await _controller!.setFocusMode(FocusMode.auto);
       await _controller!.setExposurePoint(focusPoint);
@@ -111,7 +111,7 @@ class _SeedDetectionPageState extends State<SeedDetectionPage> {
       print("Focus Error: $e");
     }
 
-    // 4. Hide the focus circle after 1 second
+    // Hide the focus circle after 1 second
     await Future.delayed(const Duration(seconds: 1));
     if (mounted) {
       setState(() => _showFocusCircle = false);
@@ -136,7 +136,6 @@ class _SeedDetectionPageState extends State<SeedDetectionPage> {
       img.Image? decodedImage = img.decodeImage(pngBytes);
       if (decodedImage == null) return;
 
-      // Use the optimized internal inference that handles resizing/letterboxing
       final results = await _onnxService.runInferenceOnLiveImage(decodedImage);
 
       if (mounted && _isLiveMode) {
@@ -161,15 +160,15 @@ class _SeedDetectionPageState extends State<SeedDetectionPage> {
 
   @override
   void dispose() {
-    // 1. Set the flag to false so the inference loop stops immediately
+    // Set the flag to false
     _isLiveMode = false;
 
-    // 2. Stop the image stream if it is currently running
+    // Stop the image stream if it is currently running
     if (_controller != null && _controller!.value.isStreamingImages) {
       _controller!.stopImageStream();
     }
 
-    // 3. dispose of the hardware controller
+    // dispose of the hardware controller
     _controller?.dispose();
 
     super.dispose();

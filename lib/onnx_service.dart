@@ -25,9 +25,6 @@ class OnnxService {
   OrtSession? _session;
   List<String>? _labels;
 
-  static const double TARGET_COIN_WIDTH =
-      710.0; // Calculated by getting average pixel width of coins in the training dataset
-
   Future<void> initModel() async {
     try {
       OrtEnv.instance.init();
@@ -43,79 +40,35 @@ class OnnxService {
       _labels = labelsData.split('\n').where((s) => s.isNotEmpty).toList();
       print("Model and Labels loaded. Classes: ${_labels!.length}");
     } catch (e) {
-      print("❌ ERROR loading model: $e");
+      print("ERROR loading model: $e");
     }
   }
 
   Future<List<YoloPrediction>> runInference(File imageFile) async {
-    print("🔍 runInference called");
+    print("runInference called");
     print("Session is null? ${_session == null}");
     if (_session == null) {
-      print("⚠️ ONNX Session is null! Initializing model...");
+      print("ONNX Session is null! Initializing model...");
       await initModel();
     }
     if (_session == null) {
-      print("❌ Failed to initialize model");
+      print("Failed to initialize model");
       return [];
     }
 
     try {
-      // 1. Image Pre-processing
+      // Image Pre-processing
       final bytes = await imageFile.readAsBytes();
       img.Image? originalImage = img.decodeImage(bytes);
       if (originalImage == null) {
-        print("❌ Failed to decode image");
+        print("Failed to decode image");
         return [];
       }
 
-      // --- PASS 1: Detect the coin in the original high-res image ---
-      // print("Running Pass 1: Finding coin...");
-      // List<YoloPrediction> firstPass = await _internalInference(originalImage);
-
-      // YoloPrediction? coin;
-      // try {
-      //   // Find the coin with the highest confidence
-      //   var coins = firstPass
-      //       .where((d) => d.label.toLowerCase().contains("coin"))
-      //       .toList();
-      //   coins.sort((a, b) => b.confidence.compareTo(a.confidence));
-      //   if (coins.isNotEmpty) coin = coins.first;
-      // } catch (e) {
-      //   coin = null;
-      // }
-
-      // if (coin == null) {
-      //   print("No coin found. Falling back to standard scaling.");
-      //   return firstPass;
-      // }
-
-      // // --- PASS 2: Rescale image based on physical coin size ---
-      // // coin.w is relative to the 640px internal canvas.
-      // double scaleTo640 = min(
-      //   640 / originalImage.width,
-      //   640 / originalImage.height,
-      // );
-      // double coinWidthInOriginalPixels = coin.w / scaleTo640;
-
-      // double scaleFactor = TARGET_COIN_WIDTH / coinWidthInOriginalPixels;
-
-      // // Safety clamp: don't zoom more than 4x or shrink more than 0.25x
-      // scaleFactor = scaleFactor.clamp(0.25, 4.0);
-
-      // print("Coin detected. Scale factor: ${scaleFactor.toStringAsFixed(2)}");
-
-      // int newWidth = (originalImage.width * scaleFactor).round();
-      // img.Image rescaledImage = img.copyResize(
-      //   originalImage,
-      //   width: newWidth,
-      //   interpolation: img.Interpolation.average,
-      // );
-
-      // Run final species detection on the physically normalized image
+      // Run final species detection
       return await _internalInference(originalImage);
     } catch (e, stacktrace) {
-      print("❌ Inference Error: $e");
-      print(stacktrace); // This helps find the exact line if it fails again
+      print("Inference Error: $e");
       return [];
     }
   }

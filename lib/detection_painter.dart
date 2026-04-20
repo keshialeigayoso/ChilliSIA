@@ -12,7 +12,7 @@ class DetectionPainter extends CustomPainter {
 
     const inputSize = 640.0;
 
-    // 1. Calculate the scaling factor used in letterboxing
+    // Calculate the scaling factor used in letterboxing
     double modelScale = (originalImageSize.width > originalImageSize.height)
         ? inputSize / originalImageSize.width
         : inputSize / originalImageSize.height;
@@ -20,10 +20,9 @@ class DetectionPainter extends CustomPainter {
     double padX = (inputSize - originalImageSize.width * modelScale) / 2;
     double padY = (inputSize - originalImageSize.height * modelScale) / 2;
 
-    // 2. Calculate how the image is scaled to fit the actual phone screen
+    // Calculate how the image is scaled to fit the actual phone screen
     double screenScale = size.width / originalImageSize.width;
 
-    // If the preview is centered, we need an offset if the screen is taller than the preview
     double displayOffY =
         (size.height - (originalImageSize.height * screenScale)) / 2;
 
@@ -48,14 +47,14 @@ class DetectionPainter extends CustomPainter {
         ..strokeWidth = 2
         ..style = PaintingStyle.stroke;
 
-      // 3. Remove model padding and rescale to original image pixels
+      // Remove model padding and rescale to original image pixels
       double realX = (p.x - padX) / modelScale;
       double realY = (p.y - padY) / modelScale;
       double realW = p.w / modelScale;
       double realH = p.h / modelScale;
 
-      // 4. Map from original image pixels to Screen pixels
-      // We subtract half width/height because YOLO usually outputs CENTER coordinates
+      // Map from original image pixels to Screen pixels
+      // subtract half width/height because YOLO usually outputs CENTER coordinates
       final left = (realX - realW / 2) * screenScale;
       final top = ((realY - realH / 2) * screenScale) + displayOffY;
       final width = realW * screenScale;

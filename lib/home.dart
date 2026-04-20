@@ -31,7 +31,7 @@ class _HomePageState extends State<HomePage> {
 
     try {
       final OnnxService onnxService = OnnxService();
-      // Important: Ensure model is initialized
+      // initialize model
       await onnxService.initModel();
 
       final results = await onnxService.runInference(File(pickedFile.path));
@@ -127,19 +127,6 @@ class _HomePageState extends State<HomePage> {
                   },
                   child: const Text('View Instructions'),
                 ),
-
-                // TextButton.icon(
-                //   onPressed: () {
-                //     Navigator.push(
-                //       context,
-                //       MaterialPageRoute(
-                //         builder: (context) => const AboutPage(),
-                //       ),
-                //     );
-                //   },
-                //   icon: const Icon(Icons.info_outline),
-                //   label: const Text('About ChilliSIA'),
-                // ),
               ],
             ),
           ),
